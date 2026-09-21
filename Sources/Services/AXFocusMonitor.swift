@@ -55,7 +55,8 @@ public final class AXFocusMonitor: ObservableObject {
         checkFocusedElement()
         timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
             DispatchQueue.main.async {
-                self?.checkFocusedElement()
+                guard let self else { return }
+                self.checkFocusedElement()
             }
         }
     }

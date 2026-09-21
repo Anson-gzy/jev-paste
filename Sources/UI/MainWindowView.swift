@@ -7,6 +7,10 @@ public enum NavigationSection: String, CaseIterable, Identifiable {
     case playground = "playground"
     case settings = "settings"
     
+    nonisolated public static var allCases: [NavigationSection] {
+        [.dashboard, .playground, .settings]
+    }
+
     nonisolated public var id: String { rawValue }
     
     public var title: String {
@@ -58,7 +62,8 @@ public final class MainAppViewModel: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.refreshStatus()
+                guard let self else { return }
+                self.refreshStatus()
             }
         }
     }
@@ -67,7 +72,8 @@ public final class MainAppViewModel: ObservableObject {
         permissionPollTimer?.invalidate()
         permissionPollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             DispatchQueue.main.async {
-                self?.refreshStatus()
+                guard let self else { return }
+                self.refreshStatus()
             }
         }
     }
