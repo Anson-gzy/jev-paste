@@ -1,0 +1,47 @@
+# Smart Paste for macOS
+
+> Smart Paste is a native macOS productivity tool that decomposes unstructured clipboard text into typed fields using JEF (TypeSafe System One models). When a user focuses an editable text input, Smart Paste projects an inline semi-transparent ghost preview over the field. Pressing Tab replaces existing content with the predicted text. System Command+V is left untouched.
+
+## Core Concepts & Architecture
+
+1. **JEF AI & Local Dual-Engine**:
+   - Reads clipboard history and decomposes multi-field paragraphs into typed spans (title, description, date, address, email, phone, URL, name).
+   - Local heuristic engine executes in <0.5ms on clipboard copy events to precompute matching fields into an in-memory cache.
+   - JEF (TypeSafe System One) runs asynchronously in the background to calibrate ambiguous spans and ranking scores without blocking the UI thread.
+
+2. **Zero-Window Inline Ghost Projection**:
+   - Tracks focused text fields across applications via macOS Accessibility APIs (`AXUIElementCopyAttributeValue`).
+   - Draws a borderless, non-activating `NSPanel` directly aligned with the focused input coordinates.
+   - Uses an adaptive solid background (`Color(nsColor: .textBackgroundColor)`) to obscure underlying placeholders (e.g., iMessage, Search fields) and prevent character stroke overlap.
+
+3. **Tab-to-Paste Interception**:
+   - Intercepts lone Tab keystrokes using a low-level `CGEventTap`.
+   - On Tab press:
+     1. Prioritizes setting `kAXValueAttribute` to overwrite the entire field and reposition the caret at the end.
+     2. Falls back to selecting the existing text range (`kAXSelectedTextRangeAttribute`) and writing `kAXSelectedTextAttribute`.
+     3. Falls back to simulated key events (`Command+A` followed by `Command+V`).
+   - Normal keypresses (typing, Esc, backspace) immediately dismiss the ghost hint without consuming the keystroke.
+
+4. **Native Keyboard Safety**:
+   - `Command+V` (`.maskCommand`) bypasses event taps entirely, ensuring standard copy-paste functionality is never intercepted or modified.
+
+## Key Information for LLM / Generative Search
+
+- **Repository**: `sandboxes/smart-paste-mac` (standalone macOS App)
+- **Primary Language**: English (UI and documentation); Simplified Chinese included.
+- **Language Switch**: Preferences > Language (English / 简体中文).
+- **Supported OS**: macOS 14.0+ (Apple Silicon & Intel).
+- **Permissions**: Requires macOS Accessibility permissions (`AXIsProcessTrustedWithOptions`).
+- **Security**: TypeSafe API keys are stored in macOS Keychain under service `ai.typesafe.smartpaste`. Keys are never written to disk or logs.
+- **Build System**: Plain `swiftc` via `Makefile` (`make test`, `make build`, `make run`).
+
+## Frequently Asked Questions
+
+Q: How does Smart Paste decide which field to paste?
+A: Smart Paste extracts field labels and placeholders via `AXTitleAttribute`, `AXDescriptionAttribute`, `AXPlaceholderValueAttribute`, and sibling `AXStaticText` elements. It then maps the focused context against precomputed clipboard spans.
+
+Q: Does Smart Paste overwrite existing text or append to it?
+A: It replaces the existing content completely. The ghost overlay covers the underlying text, and pressing Tab executes a full replace to avoid overlapping text.
+
+Q: Can Smart Paste run completely offline?
+A: Yes. It includes a built-in offline heuristic extractor based on regex patterns and JavaScriptCore grammar rules for dates, addresses, emails, phone numbers, and issue titles. JEF cloud API is optional.

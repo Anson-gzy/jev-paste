@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schedule Q&A · Information Extraction Workbench</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Split Screen Workspace -->
+  <main class="main-layout">
+
+    <!-- Left Pane: Schedule Document Viewer -->
+    <section class="left-pane">
+      <div class="document-scroll" id="documentScroll">
+        <article class="document-article" id="scheduleViewer">
+          <!-- Populated dynamically via app.js -->
+        </article>
+      </div>
+    </section>
+
+    <!-- Right Pane: QA & Entity Extraction Panel -->
+    <section class="right-pane">
+      <!-- Question Cards List -->
+      <div class="qa-container" id="questionsContainer">
+        <!-- Injected via app.js -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast Notification Portal -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
