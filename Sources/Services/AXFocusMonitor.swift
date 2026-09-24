@@ -69,6 +69,7 @@ public final class AXFocusMonitor: ObservableObject {
     /// 检查当前获得焦点的 UI 元素
     public func checkFocusedElement() {
         let systemWide = AXUIElementCreateSystemWide()
+        _ = AXUIElementSetMessagingTimeout(systemWide, 0.25)
         var focusedAppValue: AnyObject?
         let appStatus = AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute as CFString, &focusedAppValue)
         
@@ -77,8 +78,10 @@ public final class AXFocusMonitor: ObservableObject {
             return
         }
         
+        let app = focusedApp as! AXUIElement
+        _ = AXUIElementSetMessagingTimeout(app, 0.25)
         var focusedElemValue: AnyObject?
-        let elemStatus = AXUIElementCopyAttributeValue(focusedApp as! AXUIElement, kAXFocusedUIElementAttribute as CFString, &focusedElemValue)
+        let elemStatus = AXUIElementCopyAttributeValue(app, kAXFocusedUIElementAttribute as CFString, &focusedElemValue)
         
         guard elemStatus == .success, let focusedElem = focusedElemValue else {
             notifyFocusChanged(nil)
@@ -86,6 +89,29 @@ public final class AXFocusMonitor: ObservableObject {
         }
         
         let element = focusedElem as! AXUIElement
+        _ = AXUIElementSetMessagingTimeout(element, 0.25)
+        
+        // 同一元素快速路径：仅重新读取坐标尺寸与当前内容，复用已解析的 label/context，跳过深层遍历
+        if let cur = currentElement, let cached = currentFocusedInput, CFEqual(cur, element) {
+            guard let (cocoaRect, currentValue) = readGeometryAndValue(element: element) else {
+                notifyFocusChanged(nil)
+                return
+            }
+            if cocoaRect != cached.screenFrame || currentValue != cached.currentValue {
+                let context = FocusedInputContext(
+                    role: cached.role,
+                    label: cached.label,
+                    placeholder: cached.placeholder,
+                    windowTitle: cached.windowTitle,
+                    screenFrame: cocoaRect,
+                    currentValue: currentValue,
+                    surroundingText: cached.surroundingText
+                )
+                self.lastElementHash = cocoaRect.origin.x.hashValue ^ cocoaRect.origin.y.hashValue ^ cocoaRect.size.width.hashValue ^ currentValue.hashValue
+                notifyFocusChanged(context)
+            }
+            return
+        }
         
         // 检查 Role 是否是可输入框
         var roleValue: AnyObject?
@@ -143,30 +169,11 @@ public final class AXFocusMonitor: ObservableObject {
             return
         }
         
-        // 获取控件位置与大小
-        var posValue: AnyObject?
-        var sizeValue: AnyObject?
-        _ = AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &posValue)
-        _ = AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue)
-        
-        var point = CGPoint.zero
-        var size = CGSize.zero
-        if let pv = posValue, CFGetTypeID(pv) == AXValueGetTypeID() {
-            AXValueGetValue(pv as! AXValue, .cgPoint, &point)
-        }
-        if let sv = sizeValue, CFGetTypeID(sv) == AXValueGetTypeID() {
-            AXValueGetValue(sv as! AXValue, .cgSize, &size)
-        }
-        
-        // 输入框尺寸合理性保护：过滤掉整屏、微小元素或超大非输入区域（杜绝网页中间白色线 Bug）
-        guard size.width >= 30 && size.width <= 1400 && size.height >= 14 && size.height <= 300 else {
+        // 获取控件位置、大小及当前文本
+        guard let (cocoaRect, currentValue) = readGeometryAndValue(element: element) else {
             notifyFocusChanged(nil)
             return
         }
-        
-        // 转换 Carbon 屏幕坐标系 (左上角原点) 到 Cocoa 屏幕坐标系 (左下角原点)
-        let primaryScreenHeight = NSScreen.screens.first?.frame.height ?? 1080
-        let cocoaRect = NSRect(x: point.x, y: primaryScreenHeight - point.y - size.height, width: size.width, height: size.height)
         
         // 读取元数据（Label, Placeholder, Value, Window Title）
         var labelValue: AnyObject?
@@ -285,10 +292,6 @@ public final class AXFocusMonitor: ObservableObject {
         let label = detectedLabel
         let surrounding = surroundingTexts.reversed().joined(separator: " ")
         
-        var textValue: AnyObject?
-        _ = AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &textValue)
-        let currentValue = (textValue as? String) ?? ""
-        
         // 读取所属窗口标题
         var windowValue: AnyObject?
         var windowTitle = ""
@@ -298,21 +301,18 @@ public final class AXFocusMonitor: ObservableObject {
             windowTitle = (winTitleVal as? String) ?? ""
         }
         
-        let newHash = point.x.hashValue ^ point.y.hashValue ^ size.width.hashValue ^ currentValue.hashValue
         self.currentElement = element
-        if newHash != lastElementHash || currentFocusedInput == nil {
-            self.lastElementHash = newHash
-            let context = FocusedInputContext(
-                role: role,
-                label: label,
-                placeholder: placeholder,
-                windowTitle: windowTitle,
-                screenFrame: cocoaRect,
-                currentValue: currentValue,
-                surroundingText: surrounding
-            )
-            notifyFocusChanged(context)
-        }
+        self.lastElementHash = cocoaRect.origin.x.hashValue ^ cocoaRect.origin.y.hashValue ^ cocoaRect.size.width.hashValue ^ currentValue.hashValue
+        let context = FocusedInputContext(
+            role: role,
+            label: label,
+            placeholder: placeholder,
+            windowTitle: windowTitle,
+            screenFrame: cocoaRect,
+            currentValue: currentValue,
+            surroundingText: surrounding
+        )
+        notifyFocusChanged(context)
     }
     
     private func notifyFocusChanged(_ context: FocusedInputContext?) {
@@ -337,21 +337,60 @@ public final class AXFocusMonitor: ObservableObject {
     /// 直接通过 Accessibility 属性向当前获得焦点的输入框写入文本（零按键模拟，最高可靠性）
     @discardableResult
     public func insertTextIntoFocusedElement(_ text: String) -> Bool {
-        if let elem = currentElement, tryInsertText(elem: elem, text: text) {
-            return true
+        if let elem = currentElement {
+            _ = AXUIElementSetMessagingTimeout(elem, 0.25)
+            if tryInsertText(elem: elem, text: text) {
+                return true
+            }
         }
         
         // 尝试重新即时捕获全局前台输入框
         let systemWide = AXUIElementCreateSystemWide()
+        _ = AXUIElementSetMessagingTimeout(systemWide, 0.25)
         var appVal: AnyObject?
         guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute as CFString, &appVal) == .success,
               let app = appVal else { return false }
+        let appElem = app as! AXUIElement
+        _ = AXUIElementSetMessagingTimeout(appElem, 0.25)
         var elemVal: AnyObject?
-        guard AXUIElementCopyAttributeValue(app as! AXUIElement, kAXFocusedUIElementAttribute as CFString, &elemVal) == .success,
+        guard AXUIElementCopyAttributeValue(appElem, kAXFocusedUIElementAttribute as CFString, &elemVal) == .success,
               let elem = elemVal else { return false }
-        return tryInsertText(elem: elem as! AXUIElement, text: text)
+        let elemAX = elem as! AXUIElement
+        _ = AXUIElementSetMessagingTimeout(elemAX, 0.25)
+        return tryInsertText(elem: elemAX, text: text)
     }
     
+    private func readGeometryAndValue(element: AXUIElement) -> (NSRect, String)? {
+        var posValue: AnyObject?
+        var sizeValue: AnyObject?
+        _ = AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &posValue)
+        _ = AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue)
+        
+        var point = CGPoint.zero
+        var size = CGSize.zero
+        if let pv = posValue, CFGetTypeID(pv) == AXValueGetTypeID() {
+            AXValueGetValue(pv as! AXValue, .cgPoint, &point)
+        }
+        if let sv = sizeValue, CFGetTypeID(sv) == AXValueGetTypeID() {
+            AXValueGetValue(sv as! AXValue, .cgSize, &size)
+        }
+        
+        // 输入框尺寸合理性保护：过滤掉整屏、微小元素或超大非输入区域（杜绝网页中间白色线 Bug）
+        guard size.width >= 30 && size.width <= 1400 && size.height >= 14 && size.height <= 300 else {
+            return nil
+        }
+        
+        // 转换 Carbon 屏幕坐标系 (左上角原点) 到 Cocoa 屏幕坐标系 (左下角原点)
+        let primaryScreenHeight = NSScreen.screens.first?.frame.height ?? 1080
+        let cocoaRect = NSRect(x: point.x, y: primaryScreenHeight - point.y - size.height, width: size.width, height: size.height)
+        
+        var textValue: AnyObject?
+        _ = AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &textValue)
+        let currentValue = (textValue as? String) ?? ""
+        
+        return (cocoaRect, currentValue)
+    }
+
     private func tryInsertText(elem: AXUIElement, text: String) -> Bool {
         // 策略 1：直接赋值给 Value（彻底清空原有全部文字并替换为新建议，杜绝旧字残留与重叠）
         if AXUIElementSetAttributeValue(elem, kAXValueAttribute as CFString, text as CFTypeRef) == .success {

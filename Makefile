@@ -12,6 +12,7 @@ SWIFT_SOURCES = \
 	Sources/Core/SmartPasteBridge.swift \
 	Sources/Core/LocalHeuristicEngine.swift \
 	Sources/Core/TypeSafeClient.swift \
+	Sources/Core/LabeledValueMatcher.swift \
 	Sources/Services/ClipboardHistoryManager.swift \
 	Sources/Services/ClipboardMonitor.swift \
 	Sources/Services/PasteSimulator.swift \
@@ -36,6 +37,7 @@ TEST_SOURCES = \
 	Sources/Core/SmartPasteBridge.swift \
 	Sources/Core/LocalHeuristicEngine.swift \
 	Sources/Core/TypeSafeClient.swift \
+	Sources/Core/LabeledValueMatcher.swift \
 	Sources/Services/ClipboardHistoryManager.swift \
 	Sources/Services/ClipboardMonitor.swift \
 	Sources/Services/PasteSimulator.swift \
@@ -48,7 +50,7 @@ TEST_SOURCES = \
 
 SWIFTC_FLAGS = -O -parse-as-library -framework Cocoa -framework SwiftUI -framework Carbon -framework JavaScriptCore -framework Security
 
-.PHONY: all build test cli run clean
+.PHONY: all build test cli run install clean
 
 all: build
 

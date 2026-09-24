@@ -6,6 +6,10 @@ import Foundation
 public final class KeychainHelper {
     public static let shared = KeychainHelper()
     
+    private let lock = NSLock()
+    private var cachedApiKey: String?
+    private var isLoaded = false
+    
     private var keyFilePath: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dir = appSupport.appendingPathComponent("SmartPaste")
@@ -27,6 +31,10 @@ public final class KeychainHelper {
             try trimmed.write(to: keyFilePath, atomically: true, encoding: .utf8)
             // 严格赋予 0600 权限（仅当前用户账户可读可写，系统级文件防护）
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: keyFilePath.path)
+            lock.lock()
+            cachedApiKey = trimmed
+            isLoaded = true
+            lock.unlock()
             return true
         } catch {
             NSLog("[KeychainHelper] Failed to save key securely: %@", error.localizedDescription)
@@ -36,6 +44,30 @@ public final class KeychainHelper {
     
     /// 读取 API Key（零密码弹窗，秒级直读）
     public func getApiKey() -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        if !isLoaded {
+            cachedApiKey = readApiKeyFromDiskOrEnv()
+            isLoaded = true
+        }
+        return cachedApiKey
+    }
+    
+    /// 删除已存储的 API Key
+    @discardableResult
+    public func deleteApiKey() -> Bool {
+        if FileManager.default.fileExists(atPath: keyFilePath.path) {
+            try? FileManager.default.removeItem(at: keyFilePath)
+        }
+        lock.lock()
+        cachedApiKey = readApiKeyFromDiskOrEnv()
+        isLoaded = true
+        lock.unlock()
+        return true
+    }
+    
+    private func readApiKeyFromDiskOrEnv() -> String? {
         // 1. 优先读取用户受保护的本地私有文件
         if let data = try? Data(contentsOf: keyFilePath),
            let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -50,14 +82,5 @@ public final class KeychainHelper {
         }
         
         return nil
-    }
-    
-    /// 删除已存储的 API Key
-    @discardableResult
-    public func deleteApiKey() -> Bool {
-        if FileManager.default.fileExists(atPath: keyFilePath.path) {
-            try? FileManager.default.removeItem(at: keyFilePath)
-        }
-        return true
     }
 }

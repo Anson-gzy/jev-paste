@@ -69,6 +69,7 @@ public final class MainAppViewModel: ObservableObject {
     }
     
     private func startPermissionPolling() {
+        guard !hasAccessibilityPermission else { return }
         permissionPollTimer?.invalidate()
         permissionPollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             DispatchQueue.main.async {
@@ -83,6 +84,10 @@ public final class MainAppViewModel: ObservableObject {
         let previouslyMissing = !self.hasAccessibilityPermission
         self.hasAccessibilityPermission = granted
         self.currentClipboardText = ClipboardMonitor.shared.readCurrent() ?? ""
+        if granted {
+            permissionPollTimer?.invalidate()
+            permissionPollTimer = nil
+        }
         
         // 关键：一旦用户从系统设置完成授权，立即自动重新拉起按键拦截与焦点监控，无需重启 App！
         if granted && previouslyMissing {

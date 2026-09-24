@@ -21,8 +21,13 @@ public final class ClipboardHistoryManager: ObservableObject {
     
     private let fileManager = FileManager.default
     private var historyFileURL: URL {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("ai.typesafe.jev-paste", isDirectory: true)
+        let dir: URL
+        if let customDir = ProcessInfo.processInfo.environment["JEV_PASTE_DATA_DIR"], !customDir.isEmpty {
+            dir = URL(fileURLWithPath: customDir, isDirectory: true)
+        } else {
+            let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            dir = appSupport.appendingPathComponent("ai.typesafe.jev-paste", isDirectory: true)
+        }
         if !fileManager.fileExists(atPath: dir.path) {
             try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
         }
@@ -106,7 +111,6 @@ public final class ClipboardHistoryManager: ObservableObject {
             do {
                 let encoder = JSONEncoder()
                 encoder.dateEncodingStrategy = .iso8601
-                encoder.outputFormatting = .prettyPrinted
                 let data = try encoder.encode(items)
                 try data.write(to: url, options: .atomic)
             } catch {

@@ -1,39 +1,78 @@
-# Schedule Q&A · Information Extraction Workbench
+# 智能报销与合规审核工作台 (Smart Expense Audit Workbench)
 
-An interactive demo workbench for schedule entity extraction, bidirectional source evidence inspection, and automated parsing—crafted in the **Vercel Geist Design System**.
+基于 **Vercel Geist 极简设计系统** 构建的高保真企业报销与合规智能审核工作台。提供完整的左侧多员工单据流展示、右侧按姓名智能填报与实时合规审核，并原生支持**中文**与**英文**双版本无缝切换。
 
-## Highlights
+---
 
-- **Vercel Geist Minimalist Design**: High-contrast monochromatic palette (Dark by default, seamless Light mode), official Geist typography (`Geist Sans` & `Geist Mono`), 4px spatial rhythm, and sleek hairline borders.
-- **Split-Screen Layout**:
-  - **Left Pane**: Comprehensive schedule documents with chronological daily agendas (Tech Summit & Executive Delegation).
-  - **Right Pane**: Targeted entity extraction fields (`Location`, `Date`, `Keynote Speaker`, `Deadline`).
-- **Bidirectional Source Inspection**:
-  - Focusing on an input or clicking "Locate Source" highlights the corresponding citation in the schedule text with an amber pulse glow and smoothly centers it into view.
-  - Clicking any underlined entity in the document immediately focuses the corresponding form field.
-- **Simulated AI Auto-Extraction**: One-click end-to-end extraction animation demonstrating streaming typewriter input and sequential evidence illumination.
-- **Copy & Export**: Instant single-click formatted JSON export to clipboard.
+## 核心功能特色
 
-## Quick Start
+### 1. 左右分屏交互工作台
+- **左侧：多员工报销单据流 (Pending Claim Feed)**
+  - 展示多位员工真实的申报明细（消费明细表、发票号码、费用类别、申报事由、政策指引）。
+  - 顶部提供员工快速切换卡片（头像、姓名、申报金额、单据状态）。
+  - 提供 **「📋 复制单据文本」** 按钮，便于与 Smart Paste（智能粘贴）搭配进行无缝演示。
+  - 双向证据高亮：点击右侧表单中的“定位凭证”，左侧对应单据段落带有蓝环微光脉冲并平滑滚动到正中央；点击左侧高亮证据，右侧对应字段自动聚焦。
+- **右侧：按姓名填报与合规审核面板 (Form Extraction & Compliance Audit)**
+  - **按姓名智能回填**：支持在输入框输入员工姓名（如“张伟”或“Alex Zhang”）或点击快捷姓名芯片，具有打字机模拟填充动效。
+  - **实时合规质检引擎 (Rules Engine)**：
+    - 规则 1：**餐费限额标准**（商务宴请人均标准 ≤¥200 / $50，超标报警并检查同行名单）
+    - 规则 2：**差旅住宿标准**（酒店标准限额，超标检查 VP 特批审批单号）
+    - 规则 3：**夜间交通与加班核验**（晚间出行核验系统加班打卡或客户紧急故障单）
+    - 规则 4：**发票税号合规性**（增值税专票/普票真伪、企业税号一致性、连号防拆单预警）
+    - 规则 5：**预算额度与特批有效性**（IT采购预立项、培训成果交付交付物核销）
+  - **显眼的审核印章与综合结论**：
+    - 🟢 `● 审核合格 · 准予报销 (PASSED · APPROVED FOR PAYMENT)`
+    - 🔴 `✕ 审核不合格 · 驳回修改 (REJECTED · POLICY VIOLATION)`
+    - 🟡 `▲ 需补充材料 · 待复核 (PENDING DETAILS · CONDITIONAL)`
+  - **审核动作**：支持一键【批准报销并归档】、【驳回并附审核意见】以及【导出审计报告 JSON】。
 
-### Option 1: Direct Browser Launch
+### 2. 中文与英文双版演示 (Bilingual Demo Support)
+- **中文主页面**：`index.html`（默认中文，右侧顶部可一键切换为 English）
+- **英文独立入口**：`index-en.html`（原生英文界面与美元体系）
+- 具备完全本土化的双语数据集：
+  - 中文场景：张伟（市场部 ¥1,680）、李思琪（研发部 ¥3,850）、王强（销售部 ¥5,400）、陈雪（运营部 ¥2,400）、赵敏（设计部 ¥1,580）。
+  - 英文场景：Alex Zhang ($420)、Sarah Li ($960)、Marcus Wang ($1,350)、Emily Chen ($600)、David Zhao ($395)。
+
+---
+
+## 快速启动与体验方式
+
+### 方式 1：直接在浏览器打开
+
 ```bash
-open sandboxes/schedule-qa-demo/index.html
+# 中文演示版
+open sandboxes/expense-reimbursement-demo/index.html
+
+# 英文演示版
+open sandboxes/expense-reimbursement-demo/index-en.html
 ```
 
-### Option 2: Local HTTP Server
+### 方式 2：使用本地轻量 HTTP 服务器
+
 ```bash
-cd sandboxes/schedule-qa-demo
+cd sandboxes/expense-reimbursement-demo
 python3 -m http.server 3000
-# Open http://localhost:3000
+# 浏览器访问 http://localhost:3000
 ```
 
-## Structure
+---
+
+## 配合 Smart Paste (jev-paste) 演示流程
+
+1. 打开本演示网页。
+2. 在左侧单据流中，点击某位员工（例如 **张伟** 或 **Sarah Li**），点击单据右上角的 **「复制单据文本」**（或直接选中单据内容按下 `Cmd + C`）。
+3. 将光标聚焦到右侧姓名输入框或表单中，直接按快捷键或 Smart Paste 自动填入。
+4. 观察右侧表单各字段智能映射完成，且合规审核引擎自动给出判定结果！
+
+---
+
+## 文件结构
 
 ```
-sandboxes/schedule-qa-demo/
-├── index.html   # Semantic HTML5 with Vercel Geist navigation and split workspace
-├── style.css    # Vercel Geist design tokens, dark/light themes, focus rings
-├── app.js       # Schedule registry, extraction logic, typewriter animations
-└── README.md    # Documentation
+sandboxes/expense-reimbursement-demo/
+├── index.html       # 中文演示主入口（支持无缝热切换英文）
+├── index-en.html    # 英文独立演示入口
+├── style.css        # Geist 极简美学设计系统与报销发票/印章组件
+├── app.js           # 双语数据集、姓名检索、打字填充动效、实时审核引擎
+└── README.md        # 项目说明文档
 ```

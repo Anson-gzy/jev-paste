@@ -12,6 +12,18 @@ public final class SmartPasteCoordinator {
     private var precomputedCache: [FieldKind: String] = [:]
     private var lastPrecomputedClipboard: String = ""
     
+    // JavaScriptCore span 提取缓存，避免多次 ranking 重复调用 JS 引擎
+    private var spanCache: [String: [CandidateSpan]] = [:]
+    public var spanCacheCount: Int { spanCache.count }
+    
+    public func cachedSpans(for text: String) -> [CandidateSpan] {
+        if let cached = spanCache[text] { return cached }
+        let spans = (try? self.bridge?.extractCandidates(from: text)) ?? []
+        spanCache[text] = spans
+        if spanCache.count > 600 { spanCache.removeAll() }
+        return spans
+    }
+    
     // 标记当前是否正在执行模拟粘贴（防止自发剪贴板事件冲刷 Master Clipboard）
     public var isSimulatingPaste: Bool = false
     
@@ -60,7 +72,7 @@ public final class SmartPasteCoordinator {
         masterClipboardText = trimmed
         
         // 1. 本地启发式全量极速预解析 (< 0.5ms)，立即把各字段填满缓存！
-        let spans = (try? self.bridge?.extractCandidates(from: trimmed)) ?? []
+        let spans = cachedSpans(for: trimmed)
         let allKinds: [FieldKind] = [.title, .description, .address, .date, .email, .tel, .url, .name]
         let dummyFields = allKinds.map { FormField(id: $0.rawValue, kind: $0, label: $0.displayName) }
         let fullContext = FormContext(heading: "Form", fields: dummyFields)
@@ -113,19 +125,12 @@ public final class SmartPasteCoordinator {
     }
     
     private func renderGhost(for ctx: FocusedInputContext) {
-        let fieldKind = inferFieldKind(from: ctx)
-        // 智能门禁检测：若不应推荐，立即彻底隐藏，绝不打扰用户
-        guard shouldRecommend(for: ctx, inferredKind: fieldKind) else {
-            GhostOverlayController.shared.hide()
-            return
-        }
-        
         guard let suggestion = quickSuggestion(for: ctx) else {
             GhostOverlayController.shared.hide()
             return
         }
         
-        let targetKind = fieldKind ?? .title
+        let targetKind = inferFieldKind(from: ctx) ?? .title
         let fieldLabel = ctx.label.isEmpty ? (ctx.placeholder.isEmpty ? targetKind.displayName : ctx.placeholder) : ctx.label
         
         GhostOverlayController.shared.show(
@@ -144,18 +149,15 @@ public final class SmartPasteCoordinator {
         
         let label = ctx.label.lowercased()
         let placeholder = ctx.placeholder.lowercased()
-        let role = ctx.role
+        let direct = "\(label) \(placeholder)"
         
         // 2. 搜索框 / 过滤框：用户旨在主动检索输入，绝不弹出整段剪贴板推荐
-        if role == "AXSearchField" ||
-           label.contains("search") || label.contains("搜索") || label.contains("filter") || label.contains("过滤") ||
-           placeholder.contains("search") || placeholder.contains("搜索") || placeholder.contains("find") {
+        if ctx.role == "AXSearchField" || matchSemantic(direct, en: "\\b(?:search|filter|find)s?\\b", zh: ["搜索", "过滤"]) {
             return false
         }
         
         // 3. 密码 / PIN / Token / 验证码等敏感输入框：绝不推荐
-        let sensitiveKeywords = ["password", "passwd", "密码", "pin", "token", "cvv", "secret", "验证码", "captcha"]
-        if sensitiveKeywords.contains(where: { label.contains($0) || placeholder.contains($0) }) {
+        if matchSemantic(direct, en: "\\b(?:password|passwd|pin|token|cvv|secret|captcha)s?\\b", zh: ["密码", "验证码"]) {
             return false
         }
         
@@ -169,34 +171,48 @@ public final class SmartPasteCoordinator {
     
     /// 快速获取针对指定输入框上下文的最佳匹配建议（遍历历史剪贴板并应用时间衰减加权）
     public func quickSuggestion(for ctx: FocusedInputContext) -> String? {
-        let fieldKind = inferFieldKind(from: ctx)
-        guard shouldRecommend(for: ctx, inferredKind: fieldKind), let kind = fieldKind else {
-            return nil
-        }
-        
-        let fieldLabel = ctx.label.isEmpty ? (ctx.placeholder.isEmpty ? kind.displayName : ctx.placeholder) : ctx.label
+        guard shouldRecommend(for: ctx, inferredKind: .title) else { return nil }
         
         // 1. 获取全量历史剪贴板（如果历史池为空，自动补齐当前剪贴板）
         var history = ClipboardHistoryManager.shared.historyItems
         let currentClip = !self.masterClipboardText.isEmpty ? self.masterClipboardText : (ClipboardMonitor.shared.readCurrent() ?? "")
-        if history.isEmpty && !currentClip.isEmpty {
-            history = [ClipboardHistoryItem(text: currentClip, timestamp: Date())]
+        if !currentClip.isEmpty && !history.contains(where: { $0.text == currentClip }) {
+            history.insert(ClipboardHistoryItem(text: currentClip, timestamp: Date()), at: 0)
         }
         
-        // 2. 在全量历史剪贴板中执行时间衰减加权打分匹配
-        let ranked = rankSuggestions(
-            for: kind,
-            label: fieldLabel,
-            history: history,
-            referenceDate: Date(),
-            latestText: currentClip
-        )
+        // 2. 优先尝试标签键值对匹配 (无需 FieldKind，支持各类结构化表单)
+        if let labelled = rankLabelled(for: ctx, history: history, latestText: currentClip) {
+            return labelled
+        }
         
-        // 3. 高置信度门槛：必须满足综合得分 >= 0.55，宁缺毋滥
+        // 3. 兜底回退：基于推断字段类型的语义提取匹配
+        guard let kind = inferFieldKind(from: ctx) else { return nil }
+        let fieldLabel = ctx.label.isEmpty ? (ctx.placeholder.isEmpty ? kind.displayName : ctx.placeholder) : ctx.label
+        let ranked = rankSuggestions(for: kind, label: fieldLabel, history: history, referenceDate: Date(), latestText: currentClip)
         if let top = ranked.first, top.finalScore >= 0.55, top.text != ctx.currentValue {
             return top.text
         }
-        
+        return nil
+    }
+
+    private func rankLabelled(for ctx: FocusedInputContext, history: [ClipboardHistoryItem], latestText: String) -> String? {
+        let labels = [ctx.label, ctx.placeholder].map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        guard !labels.isEmpty else { return nil }
+        var scored: [String: (score: Double, ts: Date)] = [:]
+        let now = Date()
+        for item in history {
+            for pair in LabeledValueMatcher.parsePairs(from: item.text) where !pair.value.isEmpty {
+                let sim = labels.map { LabeledValueMatcher.similarity($0, pair.key) }.max() ?? 0.0
+                guard sim >= 0.6 else { continue }
+                let tw = ClipboardHistoryManager.shared.computeTimeWeight(for: item.timestamp, referenceDate: now)
+                let isLatest = (!latestText.isEmpty && item.text == latestText)
+                let s = (sim * (0.35 + 0.65 * tw)) + (isLatest ? 0.2 : 0.0)
+                scored[pair.value] = (scored[pair.value].map { $0.score + s * 0.4 } ?? s, max(scored[pair.value]?.ts ?? item.timestamp, item.timestamp))
+            }
+        }
+        if let top = scored.sorted(by: { $0.value.score > $1.value.score }).first, top.value.score >= 0.55, top.key != ctx.currentValue {
+            return top.key
+        }
         return nil
     }
     
@@ -214,7 +230,7 @@ public final class SmartPasteCoordinator {
         let targetContext = FormContext(heading: "Form", fields: [targetField])
         
         for item in history {
-            let spans = (try? self.bridge?.extractCandidates(from: item.text)) ?? []
+            let spans = cachedSpans(for: item.text)
             let matches = LocalHeuristicEngine.shared.match(text: item.text, context: targetContext, spans: spans)
             
             for match in matches where match.kind == kind && !match.text.isEmpty {
@@ -255,61 +271,58 @@ public final class SmartPasteCoordinator {
         return scoredMap.values.sorted { $0.finalScore > $1.finalScore }
     }
     
+    private func matchSemantic(_ text: String, en: String, zh: [String] = []) -> Bool {
+        if text.range(of: en, options: [.regularExpression, .caseInsensitive]) != nil { return true }
+        return zh.contains(where: { text.contains($0) })
+    }
+    
     /// 从控件上下文精准推断字段类型（采用主标题 -> 占位符 -> 上下文的层级漏斗，无明确语义返回 nil）
     public func inferFieldKind(from context: FocusedInputContext) -> FieldKind? {
         let label = context.label.lowercased()
         let placeholder = context.placeholder.lowercased()
         let direct = "\(label) \(placeholder)"
         
-        // --- 漏斗第 1 层：直接根据控件自身标签（label）与占位符（placeholder）精准推断 ---
-        // 1. 姓名/主讲人/嘉宾/议题 (如 "Keynote Speaker & Topic", "Symposium Speaker", "Program", "Dr. William Zhang", "Prof.")
-        if direct.contains("speaker") || direct.contains("keynote") || direct.contains("guest") || direct.contains("主讲") || direct.contains("讲者") || direct.contains("嘉宾") || direct.contains("name") || direct.contains("姓名") || direct.contains("contact") || direct.contains("联系人") || direct.contains("symposium") || (direct.contains("topic") && !direct.contains("sub-topic")) || direct.contains("program") {
+        // --- 漏斗第 1 层：英文全词匹配（允许复数 s/es），中文子串匹配 ---
+        if matchSemantic(direct, en: "\\b(?:speaker|keynote|guest|name|contact|symposium)s?\\b", zh: ["主讲", "讲者", "嘉宾", "姓名", "联系人"]) {
             return .name
         }
-        // 2. 邮箱
-        if direct.contains("email") || direct.contains("e-mail") || direct.contains("邮箱") || direct.range(of: "\\bmail\\b", options: .regularExpression) != nil {
+        if matchSemantic(direct, en: "\\b(?:email|e-mail|mail)s?\\b", zh: ["邮箱"]) {
             return .email
         }
-        // 3. 电话
-        if direct.contains("phone") || direct.contains("telephone") || direct.contains("mobile") || direct.contains("电话") || direct.contains("手机") || direct.range(of: "\\btel\\b", options: .regularExpression) != nil {
+        if matchSemantic(direct, en: "\\b(?:phone|telephone|mobile|tel)s?\\b", zh: ["电话", "手机"]) {
             return .tel
         }
-        // 4. 地点/地址/场馆/设施 (如 "Event Location", "Base Hotel & Venue", "Facility", "Accommodation")
-        if direct.contains("location") || direct.contains("地点") || direct.contains("address") || direct.contains("地址") || direct.contains("place") || direct.contains("venue") || direct.contains("会场") || direct.contains("center") || direct.contains("convention") || direct.contains("ballroom") || direct.contains("hotel") || direct.contains("facility") || direct.contains("accommodation") {
+        if matchSemantic(direct, en: "\\b(?:location|place|venue|center|convention|ballroom|hotel|facility|accommodation|shipping)s?\\b|\\baddress(?:es)?\\b", zh: ["地点", "地址", "会场"]) {
             return .address
         }
-        // 5. 日期/时间/截止期限/日程 (如 "Conference Dates", "Tour Dates", "Schedule", "Deadline", "Cutoff", "Duration")
-        if direct.contains("date") || direct.contains("time") || direct.contains("when") || direct.contains("日期") || direct.contains("时间") || direct.contains("deadline") || direct.contains("cutoff") || direct.contains("截止") || direct.contains("compliance") || direct.contains("duration") || direct.contains("schedule") {
+        if matchSemantic(direct, en: "\\b(?:date|time|when|deadline|cutoff|duration|schedule)s?\\b", zh: ["日期", "时间", "截止"]) {
             return .date
         }
-        // 6. 描述/正文
-        if direct.contains("description") || direct.contains("详细描述") || direct.contains("描述") || direct.contains("详情") || direct.contains("detail") || direct.contains("content") || direct.contains("note") || direct.contains("正文") || direct.contains("desc") {
+        if matchSemantic(direct, en: "\\b(?:description|detail|content|note|desc)s?\\b", zh: ["描述", "详细描述", "详情", "正文"]) {
             return .description
         }
-        // 7. 标题/主题/议题
-        if direct.contains("title") || direct.contains("标题") || direct.contains("subject") || direct.contains("主题") || direct.contains("summary") || direct.contains("headline") || direct.contains("theme") || direct.contains("session") || direct.contains("议题") {
+        if matchSemantic(direct, en: "\\b(?:title|subject|summary|headline|theme|session|topic)s?\\b", zh: ["标题", "主题", "议题"]) {
             return .title
         }
-        // 8. URL/链接
-        if direct.contains("url") || direct.contains("link") || direct.contains("website") || direct.contains("链接") || direct.contains("网址") {
+        if matchSemantic(direct, en: "\\b(?:url|link|website)s?\\b", zh: ["链接", "网址"]) {
             return .url
         }
         
         // --- 漏斗第 2 层：结合周围上下文辅助判断 ---
         let surrounding = context.surroundingText.lowercased()
-        if surrounding.contains("location") || surrounding.contains("venue") || surrounding.contains("address") || surrounding.contains("facility") || surrounding.contains("hotel") {
+        if matchSemantic(surrounding, en: "\\b(?:location|venue|facility|hotel)s?\\b|\\baddress(?:es)?\\b", zh: ["地点", "地址", "会场"]) {
             return .address
         }
-        if surrounding.contains("speaker") || surrounding.contains("keynote") || surrounding.contains("symposium") || surrounding.contains("program") {
+        if matchSemantic(surrounding, en: "\\b(?:speaker|keynote|symposium)s?\\b", zh: ["主讲", "讲者", "嘉宾", "姓名"]) {
             return .name
         }
-        if surrounding.contains("deadline") || surrounding.contains("cutoff") || surrounding.contains("date") || surrounding.contains("compliance") || surrounding.contains("schedule") {
+        if matchSemantic(surrounding, en: "\\b(?:deadline|cutoff|date|schedule)s?\\b", zh: ["日期", "时间", "截止"]) {
             return .date
         }
-        if surrounding.contains("title") || surrounding.contains("标题") || surrounding.contains("subject") {
+        if matchSemantic(surrounding, en: "\\b(?:title|subject|topic)s?\\b", zh: ["标题", "主题", "议题"]) {
             return .title
         }
-        if surrounding.contains("description") || surrounding.contains("描述") {
+        if matchSemantic(surrounding, en: "\\b(?:description|detail)s?\\b", zh: ["描述", "详情"]) {
             return .description
         }
         

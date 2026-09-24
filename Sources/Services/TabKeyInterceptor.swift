@@ -10,6 +10,13 @@ public final class TabKeyInterceptor {
     
     private init() {}
     
+    /// 判断是否应该拦截按键：仅在幽灵候选处于展示中、按下 Tab 键且未按下 Shift/Cmd/Alt/Ctrl 时拦截
+    public static func shouldIntercept<T: BinaryInteger>(keyCode: T, flags: CGEventFlags, ghostShowing: Bool) -> Bool {
+        guard ghostShowing, keyCode == 48 else { return false }
+        let disallowed: CGEventFlags = [.maskCommand, .maskAlternate, .maskControl, .maskShift]
+        return flags.intersection(disallowed).isEmpty
+    }
+    
     /// 开启全局按键监听
     public func start() {
         guard eventTap == nil else { return }
@@ -22,41 +29,29 @@ public final class TabKeyInterceptor {
             options: .defaultTap,
             eventsOfInterest: CGEventMask(mask),
             callback: { (_, type, event, _) -> Unmanaged<CGEvent>? in
-                if type.rawValue == 0xFFFFFFFE /* kCGEventTapDisabledByTimeout */ {
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
                     if let tap = TabKeyInterceptor.shared.eventTap {
                         CGEvent.tapEnable(tap: tap, enable: true)
                     }
-                    return Unmanaged.passRetained(event)
+                    return Unmanaged.passUnretained(event)
                 }
                 
                 if type == .keyDown {
                     let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
                     let flags = event.flags
                     
-                    // 检查是否是单独按下 Tab 键 (keyCode 48 = 0x30)
-                    let isTab = (keyCode == 48)
-                    let noModifiers = flags.intersection([.maskCommand, .maskAlternate, .maskControl]).isEmpty
+                    var isShowing = false
+                    if Thread.isMainThread {
+                        isShowing = MainActor.assumeIsolated { GhostOverlayController.shared.isShowing }
+                    } else {
+                        isShowing = DispatchQueue.main.sync { GhostOverlayController.shared.isShowing }
+                    }
                     
-                    if isTab && noModifiers {
+                    if TabKeyInterceptor.shouldIntercept(keyCode: keyCode, flags: flags, ghostShowing: isShowing) {
                         var handled = false
                         let checkAndPaste = {
                             MainActor.assumeIsolated {
-                                var targetSuggestion: String? = nil
-                                
-                                if GhostOverlayController.shared.isShowing,
-                                   let suggestion = GhostOverlayController.shared.currentSuggestion {
-                                    targetSuggestion = suggestion
-                                } else {
-                                    if AXFocusMonitor.shared.currentFocusedInput == nil {
-                                        AXFocusMonitor.shared.checkFocusedElement()
-                                    }
-                                    if let currentFocus = AXFocusMonitor.shared.currentFocusedInput {
-                                        // 容错兜底：即使 GhostOverlay 未显式激活，只要处于输入框且有预测建议，Tab 键依然执行填入！
-                                        targetSuggestion = SmartPasteCoordinator.shared.quickSuggestion(for: currentFocus)
-                                    }
-                                }
-                                NSLog("[TabKeyInterceptor] Tab pressed, targetSuggestion: %@", targetSuggestion ?? "nil")
-                                if let suggestion = targetSuggestion {
+                                if let suggestion = GhostOverlayController.shared.currentSuggestion {
                                     GhostOverlayController.shared.hide()
                                     let frontName = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
                                     let isBrowser = ["Safari", "Google Chrome", "Chromium", "Arc", "Brave Browser", "Microsoft Edge", "Firefox"].contains(frontName)
@@ -86,7 +81,7 @@ public final class TabKeyInterceptor {
                             // 拦截本次 Tab，不让输入框跳转或插入制表符
                             return nil
                         }
-                    } else if !flags.contains(.maskCommand) {
+                    } else if isShowing && !flags.contains(.maskCommand) {
                         // 用户输入了普通字符、退格、空格或按了 Esc，立即彻底隐藏，绝不遮挡用户打字
                         let dismissGhost = {
                             MainActor.assumeIsolated {
@@ -103,7 +98,7 @@ public final class TabKeyInterceptor {
                     }
                     // 系统的 Command+V 或其他任何按键完全放行，不受任何影响
                 }
-                return Unmanaged.passRetained(event)
+                return Unmanaged.passUnretained(event)
             },
             userInfo: nil
         ) else {

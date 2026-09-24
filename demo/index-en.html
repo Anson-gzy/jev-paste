@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>企业智能报销与合规审核工作台 · Smart Expense Audit Workbench</title>
+  <title>Smart Expense & Compliance Audit Workbench</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,27 +11,27 @@
   <!-- Top App Navigation Bar -->
   <header class="app-header">
     <div class="header-left">
-      <div class="brand-icon">¥</div>
+      <div class="brand-icon">$</div>
       <div class="brand-info">
-        <span class="brand-title" data-i18n="brandTitle">企业智能报销与合规审核工作台</span>
-        <span class="brand-badge" data-i18n="brandBadge">AI 决策核验版</span>
+        <span class="brand-title" data-i18n="brandTitle">Smart Expense & Compliance Audit Workbench</span>
+        <span class="brand-badge" data-i18n="brandBadge">AI Audit Engine</span>
       </div>
     </div>
 
     <div class="header-right">
       <!-- Language Switcher Pill -->
       <div class="lang-toggle-group">
-        <button class="lang-btn active" data-lang="zh">中文</button>
-        <button class="lang-btn" data-lang="en">English</button>
+        <button class="lang-btn" data-lang="zh">中文</button>
+        <button class="lang-btn active" data-lang="en">English</button>
       </div>
 
-      <a href="index-en.html" class="header-action-btn" title="Open Independent English Page" style="text-decoration:none;">
+      <a href="index.html" class="header-action-btn" title="Open Chinese Portal" style="text-decoration:none;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="2" y1="12" x2="22" y2="12"></line>
           <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
         </svg>
-        <span>English Portal</span>
+        <span>中文版入口</span>
       </a>
     </div>
   </header>
@@ -44,7 +44,7 @@
       <!-- Employee Quick Switcher Bar -->
       <div class="employee-selector-bar">
         <div class="selector-header">
-          <span class="selector-title" data-i18n="claimantSelectLabel">待审核报销单列表</span>
+          <span class="selector-title" data-i18n="claimantSelectLabel">Pending Claim Documents</span>
         </div>
         <div class="employee-tabs" id="employeeTabs">
           <!-- Dynamically populated via app.js -->
@@ -66,20 +66,20 @@
         <!-- Itemized Form Section Card -->
         <div class="form-section-card">
           <div class="form-header-bar">
-            <span class="form-section-title" data-i18n="formTitle">报销申报明细单</span>
+            <span class="form-section-title" data-i18n="formTitle">Itemized Claim Form</span>
             <div class="form-header-actions">
-              <button class="form-tool-btn" id="btnFillSample" title="填入当前选中的单据数据">
+              <button class="form-tool-btn" id="btnFillSample" title="Fill data from currently selected claim">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polyline>
                 </svg>
-                <span data-i18n="btnFillCurrent">填入当前单据</span>
+                <span data-i18n="btnFillCurrent">Fill Current Doc</span>
               </button>
-              <button class="form-tool-btn" id="btnClearForm" title="清空表单">
+              <button class="form-tool-btn" id="btnClearForm" title="Clear all fields">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3 6 5 6 21 6"></polyline>
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 </svg>
-                <span data-i18n="btnClear">清空</span>
+                <span data-i18n="btnClear">Clear</span>
               </button>
             </div>
           </div>
@@ -88,13 +88,13 @@
             <!-- Claimant Name -->
             <div class="field-group">
               <div class="field-label-row">
-                <label class="field-label" for="inputClaimant" data-i18n="fieldClaimant">申报人姓名</label>
+                <label class="field-label" for="inputClaimant" data-i18n="fieldClaimant">Claimant Name</label>
                 <div style="display:inline-flex; align-items:center; gap:8px;">
                   <button class="locate-field-btn" id="btnFillByName" style="color:var(--text-900);">
-                    <span data-i18n="btnFillByName">根据姓名填入</span>
+                    <span data-i18n="btnFillByName">Fill by Name</span>
                   </button>
                   <button class="locate-field-btn" data-target="name">
-                    <span data-i18n="locateEvidence">定位凭证</span>
+                    <span data-i18n="locateEvidence">Locate Evidence</span>
                   </button>
                 </div>
               </div>
@@ -102,7 +102,7 @@
                 type="text" 
                 class="field-input" 
                 id="inputClaimant" 
-                placeholder="输入员工姓名（如：张伟、李思奇）后回车或使用智能粘贴..." 
+                placeholder="Enter employee name (e.g. James Anderson, Sarah Miller) or trigger Smart Paste..." 
                 autocomplete="off" 
                 spellcheck="false" 
               />
@@ -112,9 +112,9 @@
             <div class="field-row-split" style="display:flex; gap:12px;">
               <div class="field-group" style="flex:1;">
                 <div class="field-label-row">
-                  <label class="field-label" for="inputEmpId" data-i18n="fieldEmpId">员工工号</label>
+                  <label class="field-label" for="inputEmpId" data-i18n="fieldEmpId">Employee ID</label>
                   <button class="locate-field-btn" data-target="empId">
-                    <span data-i18n="locateEvidence">定位凭证</span>
+                    <span data-i18n="locateEvidence">Locate Evidence</span>
                   </button>
                 </div>
                 <input type="text" class="field-input mono" id="inputEmpId" />
@@ -122,9 +122,9 @@
 
               <div class="field-group" style="flex:1;">
                 <div class="field-label-row">
-                  <label class="field-label" for="inputDept" data-i18n="fieldDept">所属部门</label>
+                  <label class="field-label" for="inputDept" data-i18n="fieldDept">Department</label>
                   <button class="locate-field-btn" data-target="dept">
-                    <span data-i18n="locateEvidence">定位凭证</span>
+                    <span data-i18n="locateEvidence">Locate Evidence</span>
                   </button>
                 </div>
                 <input type="text" class="field-input" id="inputDept" />
@@ -134,9 +134,9 @@
             <!-- Expense Category -->
             <div class="field-group">
               <div class="field-label-row">
-                <label class="field-label" for="inputCategory" data-i18n="fieldCategory">费用类别</label>
+                <label class="field-label" for="inputCategory" data-i18n="fieldCategory">Expense Category</label>
                 <button class="locate-field-btn" data-target="category">
-                  <span data-i18n="locateEvidence">定位凭证</span>
+                  <span data-i18n="locateEvidence">Locate Evidence</span>
                 </button>
               </div>
               <input type="text" class="field-input" id="inputCategory" />
@@ -146,9 +146,9 @@
             <div class="field-row-split" style="display:flex; gap:12px;">
               <div class="field-group" style="flex:1;">
                 <div class="field-label-row">
-                  <label class="field-label" for="inputAmount" data-i18n="fieldAmount">申报总金额</label>
+                  <label class="field-label" for="inputAmount" data-i18n="fieldAmount">Total Amount</label>
                   <button class="locate-field-btn" data-target="amount">
-                    <span data-i18n="locateEvidence">定位凭证</span>
+                    <span data-i18n="locateEvidence">Locate Evidence</span>
                   </button>
                 </div>
                 <input type="text" class="field-input mono" id="inputAmount" style="font-weight:600;" />
@@ -156,9 +156,9 @@
 
               <div class="field-group" style="flex:1;">
                 <div class="field-label-row">
-                  <label class="field-label" for="inputDate" data-i18n="fieldDate">费用发生日期</label>
+                  <label class="field-label" for="inputDate" data-i18n="fieldDate">Expense Date</label>
                   <button class="locate-field-btn" data-target="date">
-                    <span data-i18n="locateEvidence">定位凭证</span>
+                    <span data-i18n="locateEvidence">Locate Evidence</span>
                   </button>
                 </div>
                 <input type="text" class="field-input" id="inputDate" />
@@ -168,9 +168,9 @@
             <!-- Invoice No -->
             <div class="field-group">
               <div class="field-label-row">
-                <label class="field-label" for="inputInvoiceNo" data-i18n="fieldInvoice">发票号码 / 代码</label>
+                <label class="field-label" for="inputInvoiceNo" data-i18n="fieldInvoice">Invoice / Receipt No.</label>
                 <button class="locate-field-btn" data-target="invoiceNo">
-                  <span data-i18n="locateEvidence">定位凭证</span>
+                  <span data-i18n="locateEvidence">Locate Evidence</span>
                 </button>
               </div>
               <input type="text" class="field-input mono" id="inputInvoiceNo" />
@@ -179,9 +179,9 @@
             <!-- Purpose & Vendor Breakdown -->
             <div class="field-group">
               <div class="field-label-row">
-                <label class="field-label" for="inputPurpose" data-i18n="fieldPurpose">费用事由与商户明细</label>
+                <label class="field-label" for="inputPurpose" data-i18n="fieldPurpose">Business Purpose & Vendor</label>
                 <button class="locate-field-btn" data-target="purpose">
-                  <span data-i18n="locateEvidence">定位凭证</span>
+                  <span data-i18n="locateEvidence">Locate Evidence</span>
                 </button>
               </div>
               <input type="text" class="field-input" id="inputPurpose" />
@@ -199,14 +199,14 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
-              <span data-i18n="btnApprove">批准报销并归档</span>
+              <span data-i18n="btnApprove">Approve & Settle</span>
             </button>
             <button class="btn-audit-reject" id="btnReject">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
               </svg>
-              <span data-i18n="btnReject">驳回并附审核意见</span>
+              <span data-i18n="btnReject">Reject with Feedback</span>
             </button>
             <button class="btn-audit-export" id="btnExport" title="Export Audit Log JSON">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -214,7 +214,7 @@
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
               </svg>
-              <span data-i18n="btnExport">导出报告</span>
+              <span data-i18n="btnExport">Export Log</span>
             </button>
           </div>
         </div>

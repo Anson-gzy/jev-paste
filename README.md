@@ -52,8 +52,10 @@ Whenever you focus on an appropriate input field, **jev-paste** renders a clean,
   A compact `[Tab ⇥]` badge stays pinned to the start of the field, just like IDE / Copilot completions.
 - **Instant Dismissal & Mouse Click-Through**:
   Typing any character, backspacing, or pressing Escape dismisses the hint in 0ms. Mouse events pass straight through so you can click anywhere to position the cursor.
+- **Label-Matched Suggestions for Any Form**:
+  When copied text contains `Key: value` lines (receipts, tickets, exported records, OCR output, including values on the next line), a field whose label matches a key gets that value, with no need to know the field type. Works for Chinese and English labels.
 - **Interactive Web Demo Included**:
-  Comes with a built-in *Schedule Q&A Information Extraction Workbench* in `demo/`, built with Vercel Geist design aesthetics to test entity extraction in a real browser DOM.
+  Comes with a built-in bilingual *Smart Expense Audit Workbench* in `demo/` (`index.html` Chinese, `index-en.html` English), built with Vercel Geist design aesthetics to test extraction in a real browser DOM.
 - **Menu Bar Resident (Zero Dock Clutter)**:
   Runs cleanly in the menu bar with `LSUIElement = true`. Does not occupy Dock space.
 - **Stable Code Signature**:
@@ -114,7 +116,7 @@ System Clipboard Copy (⌘C)
 git clone https://github.com/Anson-gzy/jev-paste.git
 cd jev-paste
 
-# Run automated test suite (42/42 tests)
+# Run automated test suite
 make test
 
 # Build and install directly to /Applications/jev-paste.app
@@ -142,10 +144,10 @@ Access the control panel from the menu bar item or press **⌘O**:
 
 ## Interactive Web Demo
 
-Launch the built-in Schedule Extraction Demo:
+Launch the built-in Expense Audit Demo:
 1. Open the **jev-paste** console -> switch to **Web Demo** in the sidebar.
-2. Click **Open Demo in Browser** (launches `demo/index.html`).
-3. Copy the sample schedule on the left and click the 4 question fields on the right to experience 0ms Tab-filling.
+2. Click **Open Demo in Browser** (launches `demo/index.html`; `demo/index-en.html` is the English version).
+3. Click **Copy Claim Text** on the left, then click a form field on the right and press Tab to fill it.
 
 ---
 
