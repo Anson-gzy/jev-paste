@@ -53,11 +53,9 @@ public final class AXFocusMonitor: ObservableObject {
     public func start() {
         guard timer == nil else { return }
         checkFocusedElement()
+        // Timer 挂在主线程 RunLoop 上，回调本来就在主线程
         timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.checkFocusedElement()
-            }
+            MainActor.assumeIsolated { self?.checkFocusedElement() }
         }
     }
     

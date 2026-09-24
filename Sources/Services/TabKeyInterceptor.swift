@@ -44,7 +44,7 @@ public final class TabKeyInterceptor {
                     if Thread.isMainThread {
                         isShowing = MainActor.assumeIsolated { GhostOverlayController.shared.isShowing }
                     } else {
-                        isShowing = DispatchQueue.main.sync { GhostOverlayController.shared.isShowing }
+                        isShowing = DispatchQueue.main.sync { MainActor.assumeIsolated { GhostOverlayController.shared.isShowing } }
                     }
                     
                     if TabKeyInterceptor.shouldIntercept(keyCode: keyCode, flags: flags, ghostShowing: isShowing) {

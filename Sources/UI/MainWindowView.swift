@@ -61,10 +61,7 @@ public final class MainAppViewModel: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.refreshStatus()
-            }
+            MainActor.assumeIsolated { self?.refreshStatus() }
         }
     }
     
@@ -72,10 +69,7 @@ public final class MainAppViewModel: ObservableObject {
         guard !hasAccessibilityPermission else { return }
         permissionPollTimer?.invalidate()
         permissionPollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.refreshStatus()
-            }
+            MainActor.assumeIsolated { self?.refreshStatus() }
         }
     }
     
